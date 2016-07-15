@@ -113,11 +113,13 @@ draw_text_expanded(struct view *view, enum line_type type, const char *string, i
 
 	do {
 		size_t pos = string_expand(text, sizeof(text), string, length, opt_tab_size);
+		size_t col = view->col;
 
 		if (draw_chars(view, type, text, -1, max_width, use_tilde))
 			return true;
 		string += pos;
 		length -= pos;
+		max_width -= view->col - col;
 	} while (*string && length > 0);
 
 	return VIEW_MAX_LEN(view) <= 0;
@@ -220,14 +222,15 @@ draw_field(struct view *view, enum line_type type, const char *text, int width, 
 	}
 
 	return draw_chars(view, type, text, -1, max - 1, trim)
-	    || draw_space(view, LINE_DEFAULT, max - (view->col - col), max);
+	    || draw_space(view, type, max - (view->col - col), max);
 }
 
 static bool
 draw_date(struct view *view, struct view_column *column, const struct time *time)
 {
-	enum date date = column->opt.date.display;
-	const char *text = mkdate(time, date);
+	struct date_options *opt = &column->opt.date;
+	enum date date = opt->display;
+	const char *text = mkdate(time, date, opt->local, opt->format);
 	enum align align = date == DATE_RELATIVE ? ALIGN_RIGHT : ALIGN_LEFT;
 
 	if (date == DATE_NO)
@@ -569,26 +572,28 @@ draw_view_line_search_result(struct view *view, unsigned int lineno)
 	size_t bufsize = view->width * 4;
 	char *buf = malloc(bufsize);
 	regmatch_t pmatch[1];
-	int i;
+	regoff_t bufpos = 0;
 
-	if (!buf || mvwinnstr(view->win, lineno, 0, buf, bufsize) == ERR ||
-	    regexec(view->regex, buf, ARRAY_SIZE(pmatch), pmatch, 0)) {
+	if (!buf || mvwinnstr(view->win, lineno, 0, buf, bufsize) == ERR) {
 		free(buf);
 		return;
 	}
 
-	for (i = 0; i < ARRAY_SIZE(pmatch); i++) {
-		regoff_t start = pmatch[i].rm_so;
+	while (bufpos < bufsize && !regexec(view->regex, buf + bufpos, ARRAY_SIZE(pmatch), pmatch, 0)) {
+		regoff_t start = pmatch[0].rm_so;
+		regoff_t end = pmatch[0].rm_eo;
 
-		if (start == -1)
+		if (start == -1 || end <= 0 || end <= start)
 			continue;
 
 		mvwchgat(view->win, lineno,
-			 utf8_width_of(buf, start, -1),
-			 utf8_width_of(buf + start, pmatch[i].rm_eo - start, -1),
+			 utf8_width_of(buf, bufpos + start, -1),
+			 utf8_width_of(buf + bufpos + start, end - start, -1),
 			 get_view_attr(view, LINE_SEARCH_RESULT),
 			 get_view_color(view, LINE_SEARCH_RESULT),
 			 NULL);
+
+		bufpos += end;
 	}
 
 	free(buf);

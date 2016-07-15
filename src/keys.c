@@ -55,7 +55,7 @@ keybinding_matches(const struct keybinding *keybinding, const struct key key[],
 	bool conflict = false;
 	int i;
 
-	if (keybinding->request == REQ_NONE)
+	if (keybinding->keys < keys)
 		return false;
 
 	for (i = 0; i < keys; i++) {
@@ -80,7 +80,7 @@ keybinding_matches(const struct keybinding *keybinding, const struct key key[],
 		}
 	}
 
-	if (conflict_ptr)
+	if (conflict_ptr && keybinding->request != REQ_NONE)
 		*conflict_ptr = conflict;
 	return true;
 }
@@ -132,34 +132,54 @@ add_keybinding(struct keymap *table, enum request request,
 	return SUCCESS;
 }
 
-/* Looks for a key binding first in the given map, then in the generic map, and
- * lastly in the default keybindings. */
-enum request
-get_keybinding(const struct keymap *keymap, const struct key key[], size_t keys, int *matches)
+static enum request
+get_keybinding_in_keymap(const struct keymap *keymap, const struct key key[], size_t keys, int *matches)
 {
 	enum request request = REQ_UNKNOWN;
 	size_t i;
 
 	for (i = 0; i < keymap->size; i++)
 		if (keybinding_matches(keymap->data[i], key, keys, NULL)) {
-			if (matches)
+			if (matches && keymap->data[i]->request != REQ_NONE)
 				(*matches)++;
+			/* Overriding keybindings, might have been added
+			 * at the end of the keymap so we need to
+			 * iterate all keybindings. */
 			if (keymap->data[i]->keys == keys)
 				request = keymap->data[i]->request;
 		}
 
-	if (is_search_keymap(keymap))
-		return request;
-
-	for (i = 0; i < generic_keymap->size; i++)
-		if (keybinding_matches(generic_keymap->data[i], key, keys, NULL)) {
-			if (matches)
-				(*matches)++;
-			if (request == REQ_UNKNOWN && generic_keymap->data[i]->keys == keys)
-				request = generic_keymap->data[i]->request;
-		}
-
 	return request;
+}
+
+/* Looks for a key binding first in the given keymap, then in the generic keymap. */
+enum request
+get_keybinding(const struct keymap *keymap, const struct key key[], size_t keys, int *matches)
+{
+	enum request request = get_keybinding_in_keymap(keymap, key, keys, matches);
+
+	if (!is_search_keymap(keymap)) {
+		int generic_matches = 0;
+		enum request generic_request = get_keybinding_in_keymap(generic_keymap, key, keys, &generic_matches);
+
+		/* Include generic matches iff there are more than one
+		 * so unbound keys in the current keymap still override
+		 * generic keys while still ensuring that the key combo
+		 * handler continues to wait for more keys if there is
+		 * another possible match. E.g. while in `main` view:
+		 *
+		 *   bind generic q  quit  # 'q' will quit
+		 *   bind main    q  none  # 'q' will do nothing
+		 *   bind generic qa quit  # 'qa' will quit
+		 *   bind main    qn next  # 'qn' will move to next entry
+		 */
+		if (matches && (request == REQ_UNKNOWN || generic_matches > 1))
+			(*matches) += generic_matches;
+		if (request == REQ_UNKNOWN)
+			request = generic_request;
+	}
+
+	return request == REQ_NONE ? REQ_UNKNOWN : request;
 }
 
 

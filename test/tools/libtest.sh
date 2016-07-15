@@ -251,8 +251,15 @@ executable 'assert-var' <<EOF
 #!/bin/sh
 
 mkdir -p "$(dirname "$expected_var_file")"
-echo "\$1" >> "$expected_var_file"
-echo "\$3" >> "$HOME/$vars_file"
+while [ \$# -gt 1 ]; do
+	arg="\$1"; shift
+
+	case "\$arg" in
+		==) break ;;
+		*)  echo "\$arg" >> "$HOME/$vars_file" ;;
+	esac
+done
+echo "\$@" >> "$expected_var_file"
 EOF
 
 assert_vars()
@@ -334,6 +341,11 @@ test_require()
 		git-worktree)
 			require_git_version 2.5 \
 				"The test requires git-worktree, available in git version 2.5 or newer"
+			;;
+		address-sanitizer)
+			if [ "${TIG_ADDRESS_SANITIZER_ENABLED:-no}" != yes ]; then
+				test_skip "The test requires clang and is only run via \`make test-address-sanitizer\`"
+			fi
 			;;
 		*)
 			test_skip "Unknown feature requirement: $feature" 

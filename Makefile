@@ -63,6 +63,9 @@ endif
 
 override CPPFLAGS += '-DTIG_VERSION="$(VERSION)"'
 override CPPFLAGS += '-DSYSCONFDIR="$(sysconfdir)"'
+ifdef TIG_USER_CONFIG
+override CPPFLAGS += '-DTIG_USER_CONFIG="$(TIG_USER_CONFIG)"'
+endif
 
 ASCIIDOC ?= asciidoc
 ASCIIDOC_FLAGS = -aversion=$(VERSION) -asysconfdir=$(sysconfdir) -f doc/asciidoc.conf
@@ -196,6 +199,13 @@ $(COVERAGE_DIR)/trace:
 $(COVERAGE_DIR)/index.html: $(COVERAGE_DIR)/trace
 	$(QUIET_GENHTML)$(GENHTML) $(Q:@=--quiet) --output-directory $(COVERAGE_DIR) $<
 
+ADDRESS_SANITIZER_CFLAGS ?= -fsanitize=address -fno-omit-frame-pointer
+all-address-sanitizer: all
+all-address-sanitizer: CFLAGS += $(ADDRESS_SANITIZER_CFLAGS)
+
+test-address-sanitizer: clean all-address-sanitizer test
+test-address-sanitizer: export TIG_ADDRESS_SANITIZER_ENABLED=yes
+
 TESTS  = $(sort $(shell find test -type f -name '*-test'))
 
 clean-test:
@@ -213,7 +223,7 @@ $(TESTS): $(EXE) test/tools/test-graph
 # Other autoconf-related rules are hidden in config.make.in so that
 # they don't confuse Make when we aren't actually using ./configure
 configure: configure.ac acinclude.m4 tools/*.m4
-	./autogen.sh
+	$(QUIET_GEN)./autogen.sh
 
 .PHONY: all all-coverage all-debug clean clean-coverage clean-test doc \
 	doc-man doc-html dist distclean install install-doc \

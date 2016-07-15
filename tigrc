@@ -21,8 +21,11 @@
 #    - overflow (boolint)		: Highlight overflows? Defaults to 50 when enabled.
 #
 #   date
-#    - display (enum) [no|default|local|relative|short]
+#    - display (enum) [no|default|relative|relative-compact|custom]
 #					: Show dates?
+#    - local (bool)			: Show local dates?
+#    - format (string)			: Custom strftime(3) format
+#
 #   file-name
 #    - display (enum) [no|always|auto]	: Show file names?
 #
@@ -296,6 +299,7 @@ bind generic	v	show-version		# Show Tig version
 # Note the four leading spaces in the string to match. This is because
 # Git automatically indents commit messages by four spaces.
 
+color "---"			blue	default
 color "diff --"			yellow	default
 color "--- "			yellow	default
 color "+++ "			yellow	default

@@ -324,6 +324,7 @@ view_driver(struct view *view, enum request request)
 			maximize_view(view->prev, true);
 			view->prev = view;
 			watch_unregister(&view->watch);
+			view->parent = NULL;
 			break;
 		}
 		/* Fall-through */
@@ -419,6 +420,17 @@ filter_options(const char *argv[], bool rev_parse)
 
 		opt_cmdline_args = flags;
 	}
+
+	for (next = flags_pos = 0; argv[next]; next++) {
+		const char *arg = argv[next];
+
+		if (!strcmp(arg, "--all"))
+			argv_append(&opt_rev_args, arg);
+		else
+			argv[flags_pos++] = arg;
+	}
+
+	argv[flags_pos] = NULL;
 
 	filter_rev_parse(&opt_rev_args, "--symbolic", "--revs-only", argv);
 }

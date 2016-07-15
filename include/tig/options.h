@@ -26,6 +26,10 @@ struct ref_format;
 struct view_column;
 typedef struct view_column *view_settings;
 
+#ifndef TIG_USER_CONFIG
+#define TIG_USER_CONFIG "~/.tigrc"
+#endif
+
 #define OPTION_INFO(_) \
 	_(blame_options,		const char **,		VIEW_BLAME_LIKE) \
 	_(blame_view,			view_settings,		VIEW_NO_FLAGS) \
@@ -92,6 +96,8 @@ OPTION_INFO(DEFINE_OPTION_EXTERNS)
 
 #define DATE_COLUMN_OPTIONS(_) \
 	_(display,			enum date,		VIEW_NO_FLAGS) \
+	_(local,			bool,			VIEW_NO_FLAGS) \
+	_(format,			const char *,		VIEW_NO_FLAGS) \
 	_(width,			int,			VIEW_NO_FLAGS) \
 
 #define FILE_NAME_COLUMN_OPTIONS(_) \

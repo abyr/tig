@@ -364,7 +364,7 @@ graph_insert_parents(struct graph_v2 *graph)
 		if (graph_column_has_commit(new)) {
 			size_t match = graph_find_free_column(next_row);
 
-			if (match == next_row->size && next_row->columns[next_row->size - 1].id) {
+			if (match == next_row->size && *next_row->columns[next_row->size - 1].id) {
 				graph_insert_column(graph, next_row, next_row->size, new->id);
 				graph_insert_column(graph, row, row->size, "");
 				graph_insert_column(graph, prev_row, prev_row->size, "");
@@ -412,8 +412,12 @@ graph_remove_collapsed_columns(struct graph_v2 *graph)
 		if (commit_is_in_row(row->columns[i].id, &graph->parents) && !graph_column_has_commit(&graph->prev_row.columns[i]))
 			continue;
 
-		if (strcmp(row->columns[i - 1].id, graph->prev_row.columns[i - 1].id) != 0 || graph->prev_row.columns[i - 1].symbol.shift_left)
-			row->columns[i] = row->columns[i + 1];
+		if (strcmp(row->columns[i - 1].id, graph->prev_row.columns[i - 1].id) != 0 || graph->prev_row.columns[i - 1].symbol.shift_left) {
+			if (i + 1 >= row->size)
+				memset(&row->columns[i], 0, sizeof(row->columns[i]));
+			else
+				row->columns[i] = row->columns[i + 1];
+		}
 	}
 }
 
@@ -625,10 +629,10 @@ flanked(struct graph_row *row, int pos, int commit_pos, const char *commit_id)
 static bool
 below_commit(int pos, struct graph_v2 *graph)
 {
-	if (!pos == graph->prev_position)
+	if (pos != graph->prev_position)
 		return false;
 
-	if (!strcmp(graph->row.columns[pos].id, graph->prev_row.columns[pos].id) == 0)
+	if (strcmp(graph->row.columns[pos].id, graph->prev_row.columns[pos].id))
 		return false;
 
 	return true;

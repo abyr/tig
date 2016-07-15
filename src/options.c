@@ -494,6 +494,19 @@ parse_enum(const char *name, unsigned int *opt, const char *arg,
 	*opt = is_true ? map->entries[1].value : map->entries[0].value;
 	if (code == SUCCESS)
 		return code;
+
+	if (!strcmp(name, "date-display")) {
+		const char *msg = "";
+
+		if (!strcasecmp(arg, "local"))
+			msg = ", use the 'date-local' column option";
+		else if (!strcasecmp(arg, "short"))
+			msg = ", use the 'custom' display mode and set 'date-format'";
+
+		*opt = map->entries[1].value;
+		return error("'%s' is no longer supported for %s%s", arg, name, msg);
+	}
+
 	return error("'%s' is not a valid value for %s; using %s",
 		     arg, name, enum_name(map->entries[*opt].name));
 }
@@ -603,6 +616,24 @@ parse_option(struct option_info *option, const char *prefix, const char *arg)
 			return parse_int(option->value, arg, 0, SIZEOF_REV - 1);
 		else
 			return parse_int(option->value, arg, 0, 1024);
+	}
+
+	if (!strcmp(option->type, "const char *")) {
+		const char *alloc = NULL;
+		const char **value = option->value;
+
+		if (strlen(arg)) {
+			if (arg[0] == '"' && arg[strlen(arg) - 1] == '"')
+				alloc = strndup(arg + 1, strlen(arg + 1) - 1);
+			else
+				alloc = strdup(arg);
+			if (!alloc)
+				return ERROR_OUT_OF_MEMORY;
+		}
+
+		free((void *) *value);
+		*value = alloc;
+		return SUCCESS;
 	}
 
 	return error("Unhandled option: %s", name);
@@ -947,7 +978,7 @@ load_options(void)
 	}
 
 	if (!tigrc_user)
-		tigrc_user = "~/.tigrc";
+		tigrc_user = TIG_USER_CONFIG;
 	load_option_file(tigrc_user);
 
 	if (!diff_opts_from_args && tig_diff_opts && *tig_diff_opts) {
@@ -1004,6 +1035,16 @@ format_option_value(const struct option_info *option, char buf[], size_t bufsize
 			return buf;
 		}
 
+	} else if (!strcmp(option->type, "const char *")) {
+		const char **opt = option->value;
+		size_t bufpos = 0;
+
+		if (!*opt)
+			return "\"\"";
+		if (!string_nformat(buf, bufsize, &bufpos, "\"%s\"", *opt))
+			return NULL;
+		return buf;
+
 	} else if (!strcmp(option->type, "const char **")) {
 		const char *sep = "";
 		const char ***opt = option->value;
@@ -1054,6 +1095,9 @@ save_option_settings(FILE *file)
 		struct option_info *option = &option_info[i];
 		const char *name = enum_name(option->name);
 		const char *value = format_option_value(option, buf, sizeof(buf));
+
+		if (!value)
+			return false;
 
 		if (!suffixcmp(name, strlen(name), "-args"))
 			continue;

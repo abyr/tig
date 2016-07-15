@@ -408,7 +408,7 @@ end_update(struct view *view, bool force)
 {
 	if (!view->pipe)
 		return;
-	while (!view->ops->read(view, NULL))
+	while (!view->ops->read(view, NULL, force))
 		if (!force)
 			return;
 	if (force)
@@ -547,7 +547,7 @@ update_view(struct view *view)
 			return false;
 		}
 
-		if (!view->ops->read(view, &line)) {
+		if (!view->ops->read(view, &line, false)) {
 			report("Allocation failure");
 			end_update(view, true);
 			return false;
@@ -936,7 +936,8 @@ view_column_text(struct view *view, struct view_column_data *column_data,
 
 	case VIEW_COLUMN_DATE:
 		if (column_data->date)
-			text = mkdate(column_data->date, column->opt.date.display);
+			text = mkdate(column_data->date, column->opt.date.display,
+				      column->opt.date.local, column->opt.date.format);
 		break;
 
 	case VIEW_COLUMN_REF:
